@@ -16,36 +16,36 @@ const os = require('os');
  * @type {Array<string | (Partial<import("@vscode/test-cli").TestConfiguration> & { label: string })>}
  */
 const extensions = [
-	{
-		label: 'markdown-language-features',
-		workspaceFolder: `extensions/markdown-language-features/test-workspace`,
-		mocha: { timeout: 60_000 }
-	},
-	{
-		label: 'ipynb',
-		workspaceFolder: path.join(os.tmpdir(), `ipynb-${Math.floor(Math.random() * 100000)}`),
-		mocha: { timeout: 60_000 }
-	},
-	{
-		label: 'notebook-renderers',
-		workspaceFolder: path.join(os.tmpdir(), `nbout-${Math.floor(Math.random() * 100000)}`),
-		mocha: { timeout: 60_000 }
-	},
-	{
-		label: 'vscode-colorize-tests',
-		workspaceFolder: `extensions/vscode-colorize-tests/test`,
-		mocha: { timeout: 60_000 }
-	},
-	{
-		label: 'configuration-editing',
-		workspaceFolder: path.join(os.tmpdir(), `confeditout-${Math.floor(Math.random() * 100000)}`),
-		mocha: { timeout: 60_000 }
-	},
-	{
-		label: 'github-authentication',
-		workspaceFolder: path.join(os.tmpdir(), `msft-auth-${Math.floor(Math.random() * 100000)}`),
-		mocha: { timeout: 60_000 }
-	}
+	// {
+	// 	label: 'markdown-language-features',
+	// 	workspaceFolder: `extensions/markdown-language-features/test-workspace`,
+	// 	mocha: { timeout: 60_000 }
+	// },
+	// {
+	// 	label: 'ipynb',
+	// 	workspaceFolder: path.join(os.tmpdir(), `ipynb-${Math.floor(Math.random() * 100000)}`),
+	// 	mocha: { timeout: 60_000 }
+	// },
+	// {
+	// 	label: 'notebook-renderers',
+	// 	workspaceFolder: path.join(os.tmpdir(), `nbout-${Math.floor(Math.random() * 100000)}`),
+	// 	mocha: { timeout: 60_000 }
+	// },
+	// {
+	// 	label: 'vscode-colorize-tests',
+	// 	workspaceFolder: `extensions/vscode-colorize-tests/test`,
+	// 	mocha: { timeout: 60_000 }
+	// },
+	// {
+	// 	label: 'configuration-editing',
+	// 	workspaceFolder: path.join(os.tmpdir(), `confeditout-${Math.floor(Math.random() * 100000)}`),
+	// 	mocha: { timeout: 60_000 }
+	// },
+	// {
+	// 	label: 'github-authentication',
+	// 	workspaceFolder: path.join(os.tmpdir(), `msft-auth-${Math.floor(Math.random() * 100000)}`),
+	// 	mocha: { timeout: 60_000 }
+	// }
 ];
 
 

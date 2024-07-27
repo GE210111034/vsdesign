@@ -157,7 +157,7 @@ declare module 'vscode' {
 		 * that the returned object is *not* live and changes to the
 		 * document are not reflected.
 		 *
-		 * @param line A line number in [0, lineCount).
+		 * @param line A line number in `[0, lineCount)`.
 		 * @returns A {@link TextLine line}.
 		 */
 		lineAt(line: number): TextLine;
@@ -3087,6 +3087,55 @@ declare module 'vscode' {
 	}
 
 	/**
+	 * An EvaluatableExpression represents an expression in a document that can be evaluated by an active debugger or runtime.
+	 * The result of this evaluation is shown in a tooltip-like widget.
+	 * If only a range is specified, the expression will be extracted from the underlying document.
+	 * An optional expression can be used to override the extracted expression.
+	 * In this case the range is still used to highlight the range in the document.
+	 */
+	export class EvaluatableExpression {
+
+		/*
+		 * The range is used to extract the evaluatable expression from the underlying document and to highlight it.
+		 */
+		readonly range: Range;
+
+		/*
+		 * If specified the expression overrides the extracted expression.
+		 */
+		readonly expression?: string | undefined;
+
+		/**
+		 * Creates a new evaluatable expression object.
+		 *
+		 * @param range The range in the underlying document from which the evaluatable expression is extracted.
+		 * @param expression If specified overrides the extracted expression.
+		 */
+		constructor(range: Range, expression?: string);
+	}
+
+	/**
+	 * The evaluatable expression provider interface defines the contract between extensions and
+	 * the debug hover. In this contract the provider returns an evaluatable expression for a given position
+	 * in a document and the editor evaluates this expression in the active debug session and shows the result in a debug hover.
+	 */
+	export interface EvaluatableExpressionProvider {
+
+		/**
+		 * Provide an evaluatable expression for the given document and position.
+		 * The editor will evaluate this expression in the active debug session and will show the result in the debug hover.
+		 * The expression can be implicitly specified by the range in the underlying document or by explicitly returning an expression.
+		 *
+		 * @param document The document for which the debug hover is about to appear.
+		 * @param position The line and character position in the document where the debug hover is about to appear.
+		 * @param token A cancellation token.
+		 * @returns An EvaluatableExpression or a thenable that resolves to such. The lack of a result can be
+		 * signaled by returning `undefined` or `null`.
+		 */
+		provideEvaluatableExpression(document: TextDocument, position: Position, token: CancellationToken): ProviderResult<EvaluatableExpression>;
+	}
+
+	/**
 	 * Provide inline value as text.
 	 */
 	export class InlineValueText {
@@ -3184,6 +3233,34 @@ declare module 'vscode' {
 		 * Typically the end position of the range denotes the line where the inline values are shown.
 		 */
 		readonly stoppedLocation: Range;
+	}
+
+	/**
+	 * The inline values provider interface defines the contract between extensions and the editor's debugger inline values feature.
+	 * In this contract the provider returns inline value information for a given document range
+	 * and the editor shows this information in the editor at the end of lines.
+	 */
+	export interface InlineValuesProvider {
+
+		/**
+		 * An optional event to signal that inline values have changed.
+		 * @see {@link EventEmitter}
+		 */
+		onDidChangeInlineValues?: Event<void> | undefined;
+
+		/**
+		 * Provide "inline value" information for a given document and range.
+		 * The editor calls this method whenever debugging stops in the given document.
+		 * The returned inline values information is rendered in the editor at the end of lines.
+		 *
+		 * @param document The document for which the inline values information is needed.
+		 * @param viewPort The visible document range for which inline values should be computed.
+		 * @param context A bag containing contextual information like the current location.
+		 * @param token A cancellation token.
+		 * @returns An array of InlineValueDescriptors or a thenable that resolves to such. The lack of a result can be
+		 * signaled by returning `undefined` or `null`.
+		 */
+		provideInlineValues(document: TextDocument, viewPort: Range, context: InlineValueContext, token: CancellationToken): ProviderResult<InlineValue[]>;
 	}
 
 	/**
@@ -4606,7 +4683,7 @@ declare module 'vscode' {
 		/**
 		 * The currently active {@linkcode SignatureHelp}.
 		 *
-		 * The `activeSignatureHelp` has its [`SignatureHelp.activeSignature`] field updated based on
+		 * The `activeSignatureHelp` has its {@linkcode SignatureHelp.activeSignature activeSignature} field updated based on
 		 * the user arrowing through available signatures.
 		 */
 		readonly activeSignatureHelp: SignatureHelp | undefined;
@@ -5279,22 +5356,22 @@ declare module 'vscode' {
 	export class Color {
 
 		/**
-		 * The red component of this color in the range [0-1].
+		 * The red component of this color in the range `[0-1]`.
 		 */
 		readonly red: number;
 
 		/**
-		 * The green component of this color in the range [0-1].
+		 * The green component of this color in the range `[0-1]`.
 		 */
 		readonly green: number;
 
 		/**
-		 * The blue component of this color in the range [0-1].
+		 * The blue component of this color in the range `[0-1]`.
 		 */
 		readonly blue: number;
 
 		/**
-		 * The alpha component of this color in the range [0-1].
+		 * The alpha component of this color in the range `[0-1]`.
 		 */
 		readonly alpha: number;
 
@@ -6202,7 +6279,9 @@ declare module 'vscode' {
 		 * If the language supports Unicode identifiers (e.g. JavaScript), it is preferable
 		 * to provide a word definition that uses exclusion of known separators.
 		 * e.g.: A regex that matches anything except known separators (and dot is allowed to occur in a floating point number):
-		 *   /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g
+		 * ```
+		 * /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g
+		 * ```
 		 */
 		wordPattern?: RegExp;
 		/**
@@ -6999,6 +7078,70 @@ declare module 'vscode' {
 		 * Dispose and free associated resources.
 		 */
 		dispose(): void;
+	}
+
+	/**
+	 * A channel for containing log output.
+	 *
+	 * To get an instance of a `LogOutputChannel` use
+	 * {@link window.createOutputChannel createOutputChannel}.
+	 */
+	export interface LogOutputChannel extends OutputChannel {
+
+		/**
+		 * The current log level of the channel. Defaults to {@link env.logLevel editor log level}.
+		 */
+		readonly logLevel: LogLevel;
+
+		/**
+		 * An {@link Event} which fires when the log level of the channel changes.
+		 */
+		readonly onDidChangeLogLevel: Event<LogLevel>;
+
+		/**
+		 * Outputs the given trace message to the channel. Use this method to log verbose information.
+		 *
+		 * The message is only logged if the channel is configured to display {@link LogLevel.Trace trace} log level.
+		 *
+		 * @param message trace message to log
+		 */
+		trace(message: string, ...args: any[]): void;
+
+		/**
+		 * Outputs the given debug message to the channel.
+		 *
+		 * The message is only logged if the channel is configured to display {@link LogLevel.Debug debug} log level or lower.
+		 *
+		 * @param message debug message to log
+		 */
+		debug(message: string, ...args: any[]): void;
+
+		/**
+		 * Outputs the given information message to the channel.
+		 *
+		 * The message is only logged if the channel is configured to display {@link LogLevel.Info info} log level or lower.
+		 *
+		 * @param message info message to log
+		 */
+		info(message: string, ...args: any[]): void;
+
+		/**
+		 * Outputs the given warning message to the channel.
+		 *
+		 * The message is only logged if the channel is configured to display {@link LogLevel.Warning warning} log level or lower.
+		 *
+		 * @param message warning message to log
+		 */
+		warn(message: string, ...args: any[]): void;
+
+		/**
+		 * Outputs the given error or error message to the channel.
+		 *
+		 * The message is only logged if the channel is configured to display {@link LogLevel.Error error} log level or lower.
+		 *
+		 * @param error Error or error message to log
+		 */
+		error(error: string | Error, ...args: any[]): void;
 	}
 
 	/**
@@ -9835,6 +9978,42 @@ declare module 'vscode' {
 	}
 
 	/**
+	 * Log levels
+	 */
+	export enum LogLevel {
+
+		/**
+		 * No messages are logged with this level.
+		 */
+		Off = 0,
+
+		/**
+		 * All messages are logged with this level.
+		 */
+		Trace = 1,
+
+		/**
+		 * Messages with debug and higher log level are logged with this level.
+		 */
+		Debug = 2,
+
+		/**
+		 * Messages with info and higher log level are logged with this level.
+		 */
+		Info = 3,
+
+		/**
+		 * Messages with warning and higher log level are logged with this level.
+		 */
+		Warning = 4,
+
+		/**
+		 * Only error messages are logged with this level.
+		 */
+		Error = 5
+	}
+
+	/**
 	 * Namespace describing the environment the editor runs in.
 	 */
 	export namespace env {
@@ -11116,6 +11295,68 @@ declare module 'vscode' {
 		 * Get a new iterator with the `[mime, item]` pairs for each element in this data transfer.
 		 */
 		[Symbol.iterator](): IterableIterator<[mimeType: string, item: DataTransferItem]>;
+	}
+
+	/**
+	 * Provides support for drag and drop in `TreeView`.
+	 */
+	export interface TreeDragAndDropController<T> {
+
+		/**
+		 * The mime types that the {@link TreeDragAndDropController.handleDrop `handleDrop`} method of this `DragAndDropController` supports.
+		 * This could be well-defined, existing, mime types, and also mime types defined by the extension.
+		 *
+		 * To support drops from trees, you will need to add the mime type of that tree.
+		 * This includes drops from within the same tree.
+		 * The mime type of a tree is recommended to be of the format `application/vnd.code.tree.<treeidlowercase>`.
+		 *
+		 * Use the special `files` mime type to support all types of dropped files {@link DataTransferFile files}, regardless of the file's actual mime type.
+		 *
+		 * To learn the mime type of a dragged item:
+		 * 1. Set up your `DragAndDropController`
+		 * 2. Use the Developer: Set Log Level... command to set the level to "Debug"
+		 * 3. Open the developer tools and drag the item with unknown mime type over your tree. The mime types will be logged to the developer console
+		 *
+		 * Note that mime types that cannot be sent to the extension will be omitted.
+		 */
+		readonly dropMimeTypes: readonly string[];
+
+		/**
+		 * The mime types that the {@link TreeDragAndDropController.handleDrag `handleDrag`} method of this `TreeDragAndDropController` may add to the tree data transfer.
+		 * This could be well-defined, existing, mime types, and also mime types defined by the extension.
+		 *
+		 * The recommended mime type of the tree (`application/vnd.code.tree.<treeidlowercase>`) will be automatically added.
+		 */
+		readonly dragMimeTypes: readonly string[];
+
+		/**
+		 * When the user starts dragging items from this `DragAndDropController`, `handleDrag` will be called.
+		 * Extensions can use `handleDrag` to add their {@link DataTransferItem `DataTransferItem`} items to the drag and drop.
+		 *
+		 * When the items are dropped on **another tree item** in **the same tree**, your `DataTransferItem` objects
+		 * will be preserved. Use the recommended mime type for the tree (`application/vnd.code.tree.<treeidlowercase>`) to add
+		 * tree objects in a data transfer. See the documentation for `DataTransferItem` for how best to take advantage of this.
+		 *
+		 * To add a data transfer item that can be dragged into the editor, use the application specific mime type "text/uri-list".
+		 * The data for "text/uri-list" should be a string with `toString()`ed Uris separated by `\r\n`. To specify a cursor position in the file,
+		 * set the Uri's fragment to `L3,5`, where 3 is the line number and 5 is the column number.
+		 *
+		 * @param source The source items for the drag and drop operation.
+		 * @param dataTransfer The data transfer associated with this drag.
+		 * @param token A cancellation token indicating that drag has been cancelled.
+		 */
+		handleDrag?(source: readonly T[], dataTransfer: DataTransfer, token: CancellationToken): Thenable<void> | void;
+
+		/**
+		 * Called when a drag and drop action results in a drop on the tree that this `DragAndDropController` belongs to.
+		 *
+		 * Extensions should fire {@link TreeDataProvider.onDidChangeTreeData onDidChangeTreeData} for any elements that need to be refreshed.
+		 *
+		 * @param dataTransfer The data transfer items of the source of the drag.
+		 * @param target The target tree element that the drop is occurring on. When undefined, the target is the root.
+		 * @param token A cancellation token indicating that the drop has been cancelled.
+		 */
+		handleDrop?(target: T | undefined, dataTransfer: DataTransfer, token: CancellationToken): Thenable<void> | void;
 	}
 
 	/**
@@ -12433,6 +12674,27 @@ declare module 'vscode' {
 		readonly reason: TextDocumentChangeReason | undefined;
 	}
 
+	/**
+	 * Represents reasons why a text document is saved.
+	 */
+	export enum TextDocumentSaveReason {
+
+		/**
+		 * Manually triggered, e.g. by the user pressing save, by starting debugging,
+		 * or by an API call.
+		 */
+		Manual = 1,
+
+		/**
+		 * Automatic after a delay.
+		 */
+		AfterDelay = 2,
+
+		/**
+		 * When the editor lost focus.
+		 */
+		FocusOut = 3
+	}
 
 	/**
 	 * An event that is fired when a {@link TextDocument document} will be saved.
@@ -13718,6 +13980,33 @@ declare module 'vscode' {
 		 * @returns A {@link Disposable} that unregisters this provider when being disposed.
 		 */
 		export function registerHoverProvider(selector: DocumentSelector, provider: HoverProvider): Disposable;
+
+		/**
+		 * Register a provider that locates evaluatable expressions in text documents.
+		 * The editor will evaluate the expression in the active debug session and will show the result in the debug hover.
+		 *
+		 * If multiple providers are registered for a language an arbitrary provider will be used.
+		 *
+		 * @param selector A selector that defines the documents this provider is applicable to.
+		 * @param provider An evaluatable expression provider.
+		 * @returns A {@link Disposable} that unregisters this provider when being disposed.
+		 */
+		export function registerEvaluatableExpressionProvider(selector: DocumentSelector, provider: EvaluatableExpressionProvider): Disposable;
+
+		/**
+		 * Register a provider that returns data for the debugger's 'inline value' feature.
+		 * Whenever the generic debugger has stopped in a source file, providers registered for the language of the file
+		 * are called to return textual data that will be shown in the editor at the end of lines.
+		 *
+		 * Multiple providers can be registered for a language. In that case providers are asked in
+		 * parallel and the results are merged. A failing provider (rejected promise or exception) will
+		 * not cause a failure of the whole operation.
+		 *
+		 * @param selector A selector that defines the documents this provider is applicable to.
+		 * @param provider An inline values provider.
+		 * @returns A {@link Disposable} that unregisters this provider when being disposed.
+		 */
+		export function registerInlineValuesProvider(selector: DocumentSelector, provider: InlineValuesProvider): Disposable;
 
 		/**
 		 * Register a document highlight provider.
@@ -15360,973 +15649,386 @@ declare module 'vscode' {
 	}
 
 	/**
-	 * A breakpoint specified by a source location.
+	 * A DebugProtocolMessage is an opaque stand-in type for the [ProtocolMessage](https://microsoft.github.io/debug-adapter-protocol/specification#Base_Protocol_ProtocolMessage) type defined in the Debug Adapter Protocol.
 	 */
-	export class SourceBreakpoint extends Breakpoint {
-		/**
-		 * The source and line position of this breakpoint.
-		 */
-		readonly location: Location;
-
-		/**
-		 * Create a new breakpoint for a source location.
-		 */
-		constructor(location: Location, enabled?: boolean, condition?: string, hitCondition?: string, logMessage?: string);
+	export interface DebugProtocolMessage {
+		// Properties: see [ProtocolMessage details](https://microsoft.github.io/debug-adapter-protocol/specification#Base_Protocol_ProtocolMessage).
 	}
 
 	/**
-	 * A breakpoint specified by a function name.
+	 * A DebugProtocolSource is an opaque stand-in type for the [Source](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Source) type defined in the Debug Adapter Protocol.
 	 */
-	export class FunctionBreakpoint extends Breakpoint {
-		/**
-		 * The name of the function to which this breakpoint is attached.
-		 */
-		readonly functionName: string;
-
-		/**
-		 * Create a new function breakpoint.
-		 */
-		constructor(functionName: string, enabled?: boolean, condition?: string, hitCondition?: string, logMessage?: string);
-	}
-
-	// /**
-	//  * A DebugProtocolMessage is an opaque stand-in type for the [ProtocolMessage](https://microsoft.github.io/debug-adapter-protocol/specification#Base_Protocol_ProtocolMessage) type defined in the Debug Adapter Protocol.
-	//  */
-	// export interface DebugProtocolMessage {
-	// 	// Properties: see [ProtocolMessage details](https://microsoft.github.io/debug-adapter-protocol/specification#Base_Protocol_ProtocolMessage).
-	// }
-
-	// /**
-	//  * A DebugProtocolSource is an opaque stand-in type for the [Source](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Source) type defined in the Debug Adapter Protocol.
-	//  */
-	// export interface DebugProtocolSource {
-	// 	// Properties: see [Source details](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Source).
-	// }
-
-	// /**
-	//  * A DebugProtocolBreakpoint is an opaque stand-in type for the [Breakpoint](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Breakpoint) type defined in the Debug Adapter Protocol.
-	//  */
-	// export interface DebugProtocolBreakpoint {
-	// 	// Properties: see [Breakpoint details](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Breakpoint).
-	// }
-
-	// /**
-	//  * Configuration for a debug session.
-	//  */
-	// export interface DebugConfiguration {
-	// 	/**
-	// 	 * The type of the debug session.
-	// 	 */
-	// 	type: string;
-
-	// 	/**
-	// 	 * The name of the debug session.
-	// 	 */
-	// 	name: string;
-
-	// 	/**
-	// 	 * The request type of the debug session.
-	// 	 */
-	// 	request: string;
-
-	// 	/**
-	// 	 * Additional debug type specific properties.
-	// 	 */
-	// 	[key: string]: any;
-	// }
-
-	// /**
-	//  * A debug session.
-	//  */
-	// export interface DebugSession {
-
-	// 	/**
-	// 	 * The unique ID of this debug session.
-	// 	 */
-	// 	readonly id: string;
-
-	// 	/**
-	// 	 * The debug session's type from the {@link DebugConfiguration debug configuration}.
-	// 	 */
-	// 	readonly type: string;
-
-	// 	/**
-	// 	 * The parent session of this debug session, if it was created as a child.
-	// 	 * @see DebugSessionOptions.parentSession
-	// 	 */
-	// 	readonly parentSession?: DebugSession;
-
-	// 	/**
-	// 	 * The debug session's name is initially taken from the {@link DebugConfiguration debug configuration}.
-	// 	 * Any changes will be properly reflected in the UI.
-	// 	 */
-	// 	name: string;
-
-	// 	/**
-	// 	 * The workspace folder of this session or `undefined` for a folderless setup.
-	// 	 */
-	// 	readonly workspaceFolder: WorkspaceFolder | undefined;
-
-	// 	/**
-	// 	 * The "resolved" {@link DebugConfiguration debug configuration} of this session.
-	// 	 * "Resolved" means that
-	// 	 * - all variables have been substituted and
-	// 	 * - platform specific attribute sections have been "flattened" for the matching platform and removed for non-matching platforms.
-	// 	 */
-	// 	readonly configuration: DebugConfiguration;
-
-	// 	/**
-	// 	 * Send a custom request to the debug adapter.
-	// 	 */
-	// 	customRequest(command: string, args?: any): Thenable<any>;
-
-	// 	/**
-	// 	 * Maps a breakpoint in the editor to the corresponding Debug Adapter Protocol (DAP) breakpoint that is managed by the debug adapter of the debug session.
-	// 	 * If no DAP breakpoint exists (either because the editor breakpoint was not yet registered or because the debug adapter is not interested in the breakpoint), the value `undefined` is returned.
-	// 	 *
-	// 	 * @param breakpoint A {@link Breakpoint} in the editor.
-	// 	 * @returns A promise that resolves to the Debug Adapter Protocol breakpoint or `undefined`.
-	// 	 */
-	// 	getDebugProtocolBreakpoint(breakpoint: Breakpoint): Thenable<DebugProtocolBreakpoint | undefined>;
-	// }
-
-	// /**
-	//  * A custom Debug Adapter Protocol event received from a {@link DebugSession debug session}.
-	//  */
-	// export interface DebugSessionCustomEvent {
-	// 	/**
-	// 	 * The {@link DebugSession debug session} for which the custom event was received.
-	// 	 */
-	// 	readonly session: DebugSession;
-
-	// 	/**
-	// 	 * Type of event.
-	// 	 */
-	// 	readonly event: string;
-
-	// 	/**
-	// 	 * Event specific information.
-	// 	 */
-	// 	readonly body: any;
-	// }
-
-	// /**
-	//  * A debug configuration provider allows to add debug configurations to the debug service
-	//  * and to resolve launch configurations before they are used to start a debug session.
-	//  * A debug configuration provider is registered via {@link debug.registerDebugConfigurationProvider}.
-	//  */
-	// export interface DebugConfigurationProvider {
-	// 	/**
-	// 	 * Provides {@link DebugConfiguration debug configuration} to the debug service. If more than one debug configuration provider is
-	// 	 * registered for the same type, debug configurations are concatenated in arbitrary order.
-	// 	 *
-	// 	 * @param folder The workspace folder for which the configurations are used or `undefined` for a folderless setup.
-	// 	 * @param token A cancellation token.
-	// 	 * @returns An array of {@link DebugConfiguration debug configurations}.
-	// 	 */
-	// 	provideDebugConfigurations?(folder: WorkspaceFolder | undefined, token?: CancellationToken): ProviderResult<DebugConfiguration[]>;
-
-	// 	/**
-	// 	 * Resolves a {@link DebugConfiguration debug configuration} by filling in missing values or by adding/changing/removing attributes.
-	// 	 * If more than one debug configuration provider is registered for the same type, the resolveDebugConfiguration calls are chained
-	// 	 * in arbitrary order and the initial debug configuration is piped through the chain.
-	// 	 * Returning the value 'undefined' prevents the debug session from starting.
-	// 	 * Returning the value 'null' prevents the debug session from starting and opens the underlying debug configuration instead.
-	// 	 *
-	// 	 * @param folder The workspace folder from which the configuration originates from or `undefined` for a folderless setup.
-	// 	 * @param debugConfiguration The {@link DebugConfiguration debug configuration} to resolve.
-	// 	 * @param token A cancellation token.
-	// 	 * @returns The resolved debug configuration or undefined or null.
-	// 	 */
-	// 	resolveDebugConfiguration?(folder: WorkspaceFolder | undefined, debugConfiguration: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration>;
-
-	// 	/**
-	// 	 * This hook is directly called after 'resolveDebugConfiguration' but with all variables substituted.
-	// 	 * It can be used to resolve or verify a {@link DebugConfiguration debug configuration} by filling in missing values or by adding/changing/removing attributes.
-	// 	 * If more than one debug configuration provider is registered for the same type, the 'resolveDebugConfigurationWithSubstitutedVariables' calls are chained
-	// 	 * in arbitrary order and the initial debug configuration is piped through the chain.
-	// 	 * Returning the value 'undefined' prevents the debug session from starting.
-	// 	 * Returning the value 'null' prevents the debug session from starting and opens the underlying debug configuration instead.
-	// 	 *
-	// 	 * @param folder The workspace folder from which the configuration originates from or `undefined` for a folderless setup.
-	// 	 * @param debugConfiguration The {@link DebugConfiguration debug configuration} to resolve.
-	// 	 * @param token A cancellation token.
-	// 	 * @returns The resolved debug configuration or undefined or null.
-	// 	 */
-	// 	resolveDebugConfigurationWithSubstitutedVariables?(folder: WorkspaceFolder | undefined, debugConfiguration: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration>;
-	// }
-
-	// /**
-	//  * Represents a debug adapter executable and optional arguments and runtime options passed to it.
-	//  */
-	// export class DebugAdapterExecutable {
-
-	// 	/**
-	// 	 * Creates a description for a debug adapter based on an executable program.
-	// 	 *
-	// 	 * @param command The command or executable path that implements the debug adapter.
-	// 	 * @param args Optional arguments to be passed to the command or executable.
-	// 	 * @param options Optional options to be used when starting the command or executable.
-	// 	 */
-	// 	constructor(command: string, args?: string[], options?: DebugAdapterExecutableOptions);
-
-	// 	/**
-	// 	 * The command or path of the debug adapter executable.
-	// 	 * A command must be either an absolute path of an executable or the name of an command to be looked up via the PATH environment variable.
-	// 	 * The special value 'node' will be mapped to the editor's built-in Node.js runtime.
-	// 	 */
-	// 	readonly command: string;
-
-	// 	/**
-	// 	 * The arguments passed to the debug adapter executable. Defaults to an empty array.
-	// 	 */
-	// 	readonly args: string[];
-
-	// 	/**
-	// 	 * Optional options to be used when the debug adapter is started.
-	// 	 * Defaults to undefined.
-	// 	 */
-	// 	readonly options?: DebugAdapterExecutableOptions;
-	// }
-
-	// /**
-	//  * Options for a debug adapter executable.
-	//  */
-	// export interface DebugAdapterExecutableOptions {
-
-	// 	/**
-	// 	 * The additional environment of the executed program or shell. If omitted
-	// 	 * the parent process' environment is used. If provided it is merged with
-	// 	 * the parent process' environment.
-	// 	 */
-	// 	env?: { [key: string]: string };
-
-	// 	/**
-	// 	 * The current working directory for the executed debug adapter.
-	// 	 */
-	// 	cwd?: string;
-	// }
-
-	// /**
-	//  * Represents a debug adapter running as a socket based server.
-	//  */
-	// export class DebugAdapterServer {
-
-	// 	/**
-	// 	 * The port.
-	// 	 */
-	// 	readonly port: number;
-
-	// 	/**
-	// 	 * The host.
-	// 	 */
-	// 	readonly host?: string | undefined;
-
-	// 	/**
-	// 	 * Create a description for a debug adapter running as a socket based server.
-	// 	 */
-	// 	constructor(port: number, host?: string);
-	// }
-
-	// /**
-	//  * Represents a debug adapter running as a Named Pipe (on Windows)/UNIX Domain Socket (on non-Windows) based server.
-	//  */
-	// export class DebugAdapterNamedPipeServer {
-	// 	/**
-	// 	 * The path to the NamedPipe/UNIX Domain Socket.
-	// 	 */
-	// 	readonly path: string;
-
-	// 	/**
-	// 	 * Create a description for a debug adapter running as a Named Pipe (on Windows)/UNIX Domain Socket (on non-Windows) based server.
-	// 	 */
-	// 	constructor(path: string);
-	// }
-
-	// /**
-	//  * A debug adapter that implements the Debug Adapter Protocol can be registered with the editor if it implements the DebugAdapter interface.
-	//  */
-	// export interface DebugAdapter extends Disposable {
-
-	// 	/**
-	// 	 * An event which fires after the debug adapter has sent a Debug Adapter Protocol message to the editor.
-	// 	 * Messages can be requests, responses, or events.
-	// 	 */
-	// 	readonly onDidSendMessage: Event<DebugProtocolMessage>;
-
-	// 	/**
-	// 	 * Handle a Debug Adapter Protocol message.
-	// 	 * Messages can be requests, responses, or events.
-	// 	 * Results or errors are returned via onSendMessage events.
-	// 	 * @param message A Debug Adapter Protocol message
-	// 	 */
-	// 	handleMessage(message: DebugProtocolMessage): void;
-	// }
-
-	// /**
-	//  * A debug adapter descriptor for an inline implementation.
-	//  */
-	// export class DebugAdapterInlineImplementation {
-
-	// 	/**
-	// 	 * Create a descriptor for an inline implementation of a debug adapter.
-	// 	 */
-	// 	constructor(implementation: DebugAdapter);
-	// }
-
-	// /**
-	//  * Represents the different types of debug adapters
-	//  */
-	// export type DebugAdapterDescriptor = DebugAdapterExecutable | DebugAdapterServer | DebugAdapterNamedPipeServer | DebugAdapterInlineImplementation;
-
-	// /**
-	//  * A debug adaper factory that creates {@link DebugAdapterDescriptor debug adapter descriptors}.
-	//  */
-	// export interface DebugAdapterDescriptorFactory {
-	// 	/**
-	// 	 * 'createDebugAdapterDescriptor' is called at the start of a debug session to provide details about the debug adapter to use.
-	// 	 * These details must be returned as objects of type {@link DebugAdapterDescriptor}.
-	// 	 * Currently two types of debug adapters are supported:
-	// 	 * - a debug adapter executable is specified as a command path and arguments (see {@link DebugAdapterExecutable}),
-	// 	 * - a debug adapter server reachable via a communication port (see {@link DebugAdapterServer}).
-	// 	 * If the method is not implemented the default behavior is this:
-	// 	 *   createDebugAdapter(session: DebugSession, executable: DebugAdapterExecutable) {
-	// 	 *      if (typeof session.configuration.debugServer === 'number') {
-	// 	 *         return new DebugAdapterServer(session.configuration.debugServer);
-	// 	 *      }
-	// 	 *      return executable;
-	// 	 *   }
-	// 	 * @param session The {@link DebugSession debug session} for which the debug adapter will be used.
-	// 	 * @param executable The debug adapter's executable information as specified in the package.json (or undefined if no such information exists).
-	// 	 * @returns a {@link DebugAdapterDescriptor debug adapter descriptor} or undefined.
-	// 	 */
-	// 	createDebugAdapterDescriptor(session: DebugSession, executable: DebugAdapterExecutable | undefined): ProviderResult<DebugAdapterDescriptor>;
-	// }
-
-	// /**
-	//  * A Debug Adapter Tracker is a means to track the communication between the editor and a Debug Adapter.
-	//  */
-	// export interface DebugAdapterTracker {
-	// 	/**
-	// 	 * A session with the debug adapter is about to be started.
-	// 	 */
-	// 	onWillStartSession?(): void;
-	// 	/**
-	// 	 * The debug adapter is about to receive a Debug Adapter Protocol message from the editor.
-	// 	 */
-	// 	onWillReceiveMessage?(message: any): void;
-	// 	/**
-	// 	 * The debug adapter has sent a Debug Adapter Protocol message to the editor.
-	// 	 */
-	// 	onDidSendMessage?(message: any): void;
-	// 	/**
-	// 	 * The debug adapter session is about to be stopped.
-	// 	 */
-	// 	onWillStopSession?(): void;
-	// 	/**
-	// 	 * An error with the debug adapter has occurred.
-	// 	 */
-	// 	onError?(error: Error): void;
-	// 	/**
-	// 	 * The debug adapter has exited with the given exit code or signal.
-	// 	 */
-	// 	onExit?(code: number | undefined, signal: string | undefined): void;
-	// }
-
-	// /**
-	//  * A debug adaper factory that creates {@link DebugAdapterTracker debug adapter trackers}.
-	//  */
-	// export interface DebugAdapterTrackerFactory {
-	// 	/**
-	// 	 * The method 'createDebugAdapterTracker' is called at the start of a debug session in order
-	// 	 * to return a "tracker" object that provides read-access to the communication between the editor and a debug adapter.
-	// 	 *
-	// 	 * @param session The {@link DebugSession debug session} for which the debug adapter tracker will be used.
-	// 	 * @returns A {@link DebugAdapterTracker debug adapter tracker} or undefined.
-	// 	 */
-	// 	createDebugAdapterTracker(session: DebugSession): ProviderResult<DebugAdapterTracker>;
-	// }
-
-	// /**
-	//  * Represents the debug console.
-	//  */
-	// export interface DebugConsole {
-	// 	/**
-	// 	 * Append the given value to the debug console.
-	// 	 *
-	// 	 * @param value A string, falsy values will not be printed.
-	// 	 */
-	// 	append(value: string): void;
-
-	// 	/**
-	// 	 * Append the given value and a line feed character
-	// 	 * to the debug console.
-	// 	 *
-	// 	 * @param value A string, falsy values will be printed.
-	// 	 */
-	// 	appendLine(value: string): void;
-	// }
-
-	// /**
-	//  * Debug console mode used by debug session, see {@link DebugSessionOptions options}.
-	//  */
-	// export enum DebugConsoleMode {
-	// 	/**
-	// 	 * Debug session should have a separate debug console.
-	// 	 */
-	// 	Separate = 0,
-
-	// 	/**
-	// 	 * Debug session should share debug console with its parent session.
-	// 	 * This value has no effect for sessions which do not have a parent session.
-	// 	 */
-	// 	MergeWithParent = 1
-	// }
-
-	// /**
-	//  * Options for {@link debug.startDebugging starting a debug session}.
-	//  */
-	// export interface DebugSessionOptions {
-
-	// 	/**
-	// 	 * When specified the newly created debug session is registered as a "child" session of this
-	// 	 * "parent" debug session.
-	// 	 */
-	// 	parentSession?: DebugSession;
-
-	// 	/**
-	// 	 * Controls whether lifecycle requests like 'restart' are sent to the newly created session or its parent session.
-	// 	 * By default (if the property is false or missing), lifecycle requests are sent to the new session.
-	// 	 * This property is ignored if the session has no parent session.
-	// 	 */
-	// 	lifecycleManagedByParent?: boolean;
-
-	// 	/**
-	// 	 * Controls whether this session should have a separate debug console or share it
-	// 	 * with the parent session. Has no effect for sessions which do not have a parent session.
-	// 	 * Defaults to Separate.
-	// 	 */
-	// 	consoleMode?: DebugConsoleMode;
-
-	// 	/**
-	// 	 * Controls whether this session should run without debugging, thus ignoring breakpoints.
-	// 	 * When this property is not specified, the value from the parent session (if there is one) is used.
-	// 	 */
-	// 	noDebug?: boolean;
-
-	// 	/**
-	// 	 * Controls if the debug session's parent session is shown in the CALL STACK view even if it has only a single child.
-	// 	 * By default, the debug session will never hide its parent.
-	// 	 * If compact is true, debug sessions with a single child are hidden in the CALL STACK view to make the tree more compact.
-	// 	 */
-	// 	compact?: boolean;
-
-	// 	/**
-	// 	 * When true, a save will not be triggered for open editors when starting a debug session, regardless of the value of the `debug.saveBeforeStart` setting.
-	// 	 */
-	// 	suppressSaveBeforeStart?: boolean;
-
-	// 	/**
-	// 	 * When true, the debug toolbar will not be shown for this session.
-	// 	 */
-	// 	suppressDebugToolbar?: boolean;
-
-	// 	/**
-	// 	 * When true, the window statusbar color will not be changed for this session.
-	// 	 */
-	// 	suppressDebugStatusbar?: boolean;
-
-	// 	/**
-	// 	 * When true, the debug viewlet will not be automatically revealed for this session.
-	// 	 */
-	// 	suppressDebugView?: boolean;
-
-	// 	/**
-	// 	 * Signals to the editor that the debug session was started from a test run
-	// 	 * request. This is used to link the lifecycle of the debug session and
-	// 	 * test run in UI actions.
-	// 	 */
-	// 	testRun?: TestRun;
-	// }
-
-	// /**
-	//  * A DebugConfigurationProviderTriggerKind specifies when the `provideDebugConfigurations` method of a `DebugConfigurationProvider` is triggered.
-	//  * Currently there are two situations: to provide the initial debug configurations for a newly created launch.json or
-	//  * to provide dynamically generated debug configurations when the user asks for them through the UI (e.g. via the "Select and Start Debugging" command).
-	//  * A trigger kind is used when registering a `DebugConfigurationProvider` with {@link debug.registerDebugConfigurationProvider}.
-	//  */
-	// export enum DebugConfigurationProviderTriggerKind {
-	// 	/**
-	// 	 *	`DebugConfigurationProvider.provideDebugConfigurations` is called to provide the initial debug configurations for a newly created launch.json.
-	// 	 */
-	// 	Initial = 1,
-	// 	/**
-	// 	 * `DebugConfigurationProvider.provideDebugConfigurations` is called to provide dynamically generated debug configurations when the user asks for them through the UI (e.g. via the "Select and Start Debugging" command).
-	// 	 */
-	// 	Dynamic = 2
-	// }
-
-	// /**
-	//  * Represents a thread in a debug session.
-	//  */
-	// export class DebugThread {
-	// 	/**
-	// 	 * Debug session for thread.
-	// 	 */
-	// 	readonly session: DebugSession;
-
-	// 	/**
-	// 	 * ID of the associated thread in the debug protocol.
-	// 	 */
-	// 	readonly threadId: number;
-
-	// 	/**
-	// 	 * @hidden
-	// 	 */
-	// 	private constructor(session: DebugSession, threadId: number);
-	// }
-
-	// /**
-	//  * Represents a stack frame in a debug session.
-	//  */
-	// export class DebugStackFrame {
-	// 	/**
-	// 	 * Debug session for thread.
-	// 	 */
-	// 	readonly session: DebugSession;
-
-	// 	/**
-	// 	 * ID of the associated thread in the debug protocol.
-	// 	 */
-	// 	readonly threadId: number;
-	// 	/**
-	// 	 * ID of the stack frame in the debug protocol.
-	// 	 */
-	// 	readonly frameId: number;
-
-	// 	/**
-	// 	 * @hidden
-	// 	 */
-	// 	private constructor(session: DebugSession, threadId: number, frameId: number);
-	// }
-
-	// /**
-	//  * Namespace for debug functionality.
-	//  */
-	// export namespace debug {
-
-	// 	/**
-	// 	 * The currently active {@link DebugSession debug session} or `undefined`. The active debug session is the one
-	// 	 * represented by the debug action floating window or the one currently shown in the drop down menu of the debug action floating window.
-	// 	 * If no debug session is active, the value is `undefined`.
-	// 	 */
-	// 	export let activeDebugSession: DebugSession | undefined;
-
-	// 	/**
-	// 	 * The currently active {@link DebugConsole debug console}.
-	// 	 * If no debug session is active, output sent to the debug console is not shown.
-	// 	 */
-	// 	export let activeDebugConsole: DebugConsole;
-
-	// 	/**
-	// 	 * List of breakpoints.
-	// 	 */
-	// 	export let breakpoints: readonly Breakpoint[];
-
-	// 	/**
-	// 	 * An {@link Event} which fires when the {@link debug.activeDebugSession active debug session}
-	// 	 * has changed. *Note* that the event also fires when the active debug session changes
-	// 	 * to `undefined`.
-	// 	 */
-	// 	export const onDidChangeActiveDebugSession: Event<DebugSession | undefined>;
-
-	// 	/**
-	// 	 * An {@link Event} which fires when a new {@link DebugSession debug session} has been started.
-	// 	 */
-	// 	export const onDidStartDebugSession: Event<DebugSession>;
-
-	// 	/**
-	// 	 * An {@link Event} which fires when a custom DAP event is received from the {@link DebugSession debug session}.
-	// 	 */
-	// 	export const onDidReceiveDebugSessionCustomEvent: Event<DebugSessionCustomEvent>;
-
-	// 	/**
-	// 	 * An {@link Event} which fires when a {@link DebugSession debug session} has terminated.
-	// 	 */
-	// 	export const onDidTerminateDebugSession: Event<DebugSession>;
-
-	// 	/**
-	// 	 * An {@link Event} that is emitted when the set of breakpoints is added, removed, or changed.
-	// 	 */
-	// 	export const onDidChangeBreakpoints: Event<BreakpointsChangeEvent>;
-
-	// 	/**
-	// 	 * The currently focused thread or stack frame, or `undefined` if no
-	// 	 * thread or stack is focused. A thread can be focused any time there is
-	// 	 * an active debug session, while a stack frame can only be focused when
-	// 	 * a session is paused and the call stack has been retrieved.
-	// 	 */
-	// 	export const activeStackItem: DebugThread | DebugStackFrame | undefined;
-
-	// 	/**
-	// 	 * An event which fires when the {@link debug.activeStackItem} has changed.
-	// 	 */
-	// 	export const onDidChangeActiveStackItem: Event<DebugThread | DebugStackFrame | undefined>;
-
-	// 	/**
-	// 	 * Register a {@link DebugConfigurationProvider debug configuration provider} for a specific debug type.
-	// 	 * The optional {@link DebugConfigurationProviderTriggerKind triggerKind} can be used to specify when the `provideDebugConfigurations` method of the provider is triggered.
-	// 	 * Currently two trigger kinds are possible: with the value `Initial` (or if no trigger kind argument is given) the `provideDebugConfigurations` method is used to provide the initial debug configurations to be copied into a newly created launch.json.
-	// 	 * With the trigger kind `Dynamic` the `provideDebugConfigurations` method is used to dynamically determine debug configurations to be presented to the user (in addition to the static configurations from the launch.json).
-	// 	 * Please note that the `triggerKind` argument only applies to the `provideDebugConfigurations` method: so the `resolveDebugConfiguration` methods are not affected at all.
-	// 	 * Registering a single provider with resolve methods for different trigger kinds, results in the same resolve methods called multiple times.
-	// 	 * More than one provider can be registered for the same type.
-	// 	 *
-	// 	 * @param debugType The debug type for which the provider is registered.
-	// 	 * @param provider The {@link DebugConfigurationProvider debug configuration provider} to register.
-	// 	 * @param triggerKind The {@link DebugConfigurationProviderTriggerKind trigger} for which the 'provideDebugConfiguration' method of the provider is registered. If `triggerKind` is missing, the value `DebugConfigurationProviderTriggerKind.Initial` is assumed.
-	// 	 * @returns A {@link Disposable} that unregisters this provider when being disposed.
-	// 	 */
-	// 	export function registerDebugConfigurationProvider(debugType: string, provider: DebugConfigurationProvider, triggerKind?: DebugConfigurationProviderTriggerKind): Disposable;
-
-	// 	/**
-	// 	 * Register a {@link DebugAdapterDescriptorFactory debug adapter descriptor factory} for a specific debug type.
-	// 	 * An extension is only allowed to register a DebugAdapterDescriptorFactory for the debug type(s) defined by the extension. Otherwise an error is thrown.
-	// 	 * Registering more than one DebugAdapterDescriptorFactory for a debug type results in an error.
-	// 	 *
-	// 	 * @param debugType The debug type for which the factory is registered.
-	// 	 * @param factory The {@link DebugAdapterDescriptorFactory debug adapter descriptor factory} to register.
-	// 	 * @returns A {@link Disposable} that unregisters this factory when being disposed.
-	// 	 */
-	// 	export function registerDebugAdapterDescriptorFactory(debugType: string, factory: DebugAdapterDescriptorFactory): Disposable;
-
-	// 	/**
-	// 	 * Register a debug adapter tracker factory for the given debug type.
-	// 	 *
-	// 	 * @param debugType The debug type for which the factory is registered or '*' for matching all debug types.
-	// 	 * @param factory The {@link DebugAdapterTrackerFactory debug adapter tracker factory} to register.
-	// 	 * @returns A {@link Disposable} that unregisters this factory when being disposed.
-	// 	 */
-	// 	export function registerDebugAdapterTrackerFactory(debugType: string, factory: DebugAdapterTrackerFactory): Disposable;
-
-	// 	/**
-	// 	 * Start debugging by using either a named launch or named compound configuration,
-	// 	 * or by directly passing a {@link DebugConfiguration}.
-	// 	 * The named configurations are looked up in '.vscode/launch.json' found in the given folder.
-	// 	 * Before debugging starts, all unsaved files are saved and the launch configurations are brought up-to-date.
-	// 	 * Folder specific variables used in the configuration (e.g. '${workspaceFolder}') are resolved against the given folder.
-	// 	 * @param folder The {@link WorkspaceFolder workspace folder} for looking up named configurations and resolving variables or `undefined` for a non-folder setup.
-	// 	 * @param nameOrConfiguration Either the name of a debug or compound configuration or a {@link DebugConfiguration} object.
-	// 	 * @param parentSessionOrOptions Debug session options. When passed a parent {@link DebugSession debug session}, assumes options with just this parent session.
-	// 	 * @returns A thenable that resolves when debugging could be successfully started.
-	// 	 */
-	// 	export function startDebugging(folder: WorkspaceFolder | undefined, nameOrConfiguration: string | DebugConfiguration, parentSessionOrOptions?: DebugSession | DebugSessionOptions): Thenable<boolean>;
-
-	// 	/**
-	// 	 * Stop the given debug session or stop all debug sessions if session is omitted.
-	// 	 *
-	// 	 * @param session The {@link DebugSession debug session} to stop; if omitted all sessions are stopped.
-	// 	 * @returns A thenable that resolves when the session(s) have been stopped.
-	// 	 */
-	// 	export function stopDebugging(session?: DebugSession): Thenable<void>;
-
-	// 	/**
-	// 	 * Add breakpoints.
-	// 	 * @param breakpoints The breakpoints to add.
-	// 	 */
-	// 	export function addBreakpoints(breakpoints: readonly Breakpoint[]): void;
-
-	// 	/**
-	// 	 * Remove breakpoints.
-	// 	 * @param breakpoints The breakpoints to remove.
-	// 	 */
-	// 	export function removeBreakpoints(breakpoints: readonly Breakpoint[]): void;
-
-	// 	/**
-	// 	 * Converts a "Source" descriptor object received via the Debug Adapter Protocol into a Uri that can be used to load its contents.
-	// 	 * If the source descriptor is based on a path, a file Uri is returned.
-	// 	 * If the source descriptor uses a reference number, a specific debug Uri (scheme 'debug') is constructed that requires a corresponding ContentProvider and a running debug session
-	// 	 *
-	// 	 * If the "Source" descriptor has insufficient information for creating the Uri, an error is thrown.
-	// 	 *
-	// 	 * @param source An object conforming to the [Source](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Source) type defined in the Debug Adapter Protocol.
-	// 	 * @param session An optional debug session that will be used when the source descriptor uses a reference number to load the contents from an active debug session.
-	// 	 * @returns A uri that can be used to load the contents of the source.
-	// 	 */
-	// 	export function asDebugSourceUri(source: DebugProtocolSource, session?: DebugSession): Uri;
-	// }
-
-
-	/**
-	 * Log levels
-	 */
-	export enum LogLevel {
-
-		/**
-		 * No messages are logged with this level.
-		 */
-		Off = 0,
-
-		/**
-		 * All messages are logged with this level.
-		 */
-		Trace = 1,
-
-		/**
-		 * Messages with debug and higher log level are logged with this level.
-		 */
-		Debug = 2,
-
-		/**
-		 * Messages with info and higher log level are logged with this level.
-		 */
-		Info = 3,
-
-		/**
-		 * Messages with warning and higher log level are logged with this level.
-		 */
-		Warning = 4,
-
-		/**
-		 * Only error messages are logged with this level.
-		 */
-		Error = 5
+	export interface DebugProtocolSource {
+		// Properties: see [Source details](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Source).
 	}
 
 	/**
-	 * A channel for containing log output.
-	 *
-	 * To get an instance of a `LogOutputChannel` use
-	 * {@link window.createOutputChannel createOutputChannel}.
+	 * A DebugProtocolBreakpoint is an opaque stand-in type for the [Breakpoint](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Breakpoint) type defined in the Debug Adapter Protocol.
 	 */
-	export interface LogOutputChannel extends OutputChannel {
-
-		/**
-		 * The current log level of the channel. Defaults to {@link env.logLevel editor log level}.
-		 */
-		readonly logLevel: LogLevel;
-
-		/**
-		 * An {@link Event} which fires when the log level of the channel changes.
-		 */
-		readonly onDidChangeLogLevel: Event<LogLevel>;
-
-		/**
-		 * Outputs the given trace message to the channel. Use this method to log verbose information.
-		 *
-		 * The message is only logged if the channel is configured to display {@link LogLevel.Trace trace} log level.
-		 *
-		 * @param message trace message to log
-		 */
-		trace(message: string, ...args: any[]): void;
-
-		/**
-		 * Outputs the given debug message to the channel.
-		 *
-		 * The message is only logged if the channel is configured to display {@link LogLevel.Debug debug} log level or lower.
-		 *
-		 * @param message debug message to log
-		 */
-		debug(message: string, ...args: any[]): void;
-
-		/**
-		 * Outputs the given information message to the channel.
-		 *
-		 * The message is only logged if the channel is configured to display {@link LogLevel.Info info} log level or lower.
-		 *
-		 * @param message info message to log
-		 */
-		info(message: string, ...args: any[]): void;
-
-		/**
-		 * Outputs the given warning message to the channel.
-		 *
-		 * The message is only logged if the channel is configured to display {@link LogLevel.Warning warning} log level or lower.
-		 *
-		 * @param message warning message to log
-		 */
-		warn(message: string, ...args: any[]): void;
-
-		/**
-		 * Outputs the given error or error message to the channel.
-		 *
-		 * The message is only logged if the channel is configured to display {@link LogLevel.Error error} log level or lower.
-		 *
-		 * @param error Error or error message to log
-		 */
-		error(error: string | Error, ...args: any[]): void;
+	export interface DebugProtocolBreakpoint {
+		// Properties: see [Breakpoint details](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Breakpoint).
 	}
 
 	/**
-	 * Register a provider that returns data for the debugger's 'inline value' feature.
-	 * Whenever the generic debugger has stopped in a source file, providers registered for the language of the file
-	 * are called to return textual data that will be shown in the editor at the end of lines.
-	 *
-	 * Multiple providers can be registered for a language. In that case providers are asked in
-	 * parallel and the results are merged. A failing provider (rejected promise or exception) will
-	 * not cause a failure of the whole operation.
-	 *
-	 * @param selector A selector that defines the documents this provider is applicable to.
-	 * @param provider An inline values provider.
-	 * @returns A {@link Disposable} that unregisters this provider when being disposed.
+	 * Configuration for a debug session.
 	 */
-	export function registerInlineValuesProvider(selector: DocumentSelector, provider: InlineValuesProvider): Disposable;
-
-	/**
-	 * Register a provider that locates evaluatable expressions in text documents.
-	 * The editor will evaluate the expression in the active debug session and will show the result in the debug hover.
-	 *
-	 * If multiple providers are registered for a language an arbitrary provider will be used.
-	 *
-	 * @param selector A selector that defines the documents this provider is applicable to.
-	 * @param provider An evaluatable expression provider.
-	 * @returns A {@link Disposable} that unregisters this provider when being disposed.
-	 */
-	export function registerEvaluatableExpressionProvider(selector: DocumentSelector, provider: EvaluatableExpressionProvider): Disposable;
-
-	/**
-	 * Represents reasons why a text document is saved.
-	 */
-	export enum TextDocumentSaveReason {
+	export interface DebugConfiguration {
+		/**
+		 * The type of the debug session.
+		 */
+		type: string;
 
 		/**
-		 * Manually triggered, e.g. by the user pressing save, by starting debugging,
-		 * or by an API call.
+		 * The name of the debug session.
 		 */
-		Manual = 1,
+		name: string;
 
 		/**
-		 * Automatic after a delay.
+		 * The request type of the debug session.
 		 */
-		AfterDelay = 2,
+		request: string;
 
 		/**
-		 * When the editor lost focus.
+		 * Additional debug type specific properties.
 		 */
-		FocusOut = 3
+		[key: string]: any;
 	}
 
 	/**
-	 * Provides support for drag and drop in `TreeView`.
+	 * A debug session.
 	 */
-	export interface TreeDragAndDropController<T> {
+	export interface DebugSession {
 
 		/**
-		 * The mime types that the {@link TreeDragAndDropController.handleDrop `handleDrop`} method of this `DragAndDropController` supports.
-		 * This could be well-defined, existing, mime types, and also mime types defined by the extension.
-		 *
-		 * To support drops from trees, you will need to add the mime type of that tree.
-		 * This includes drops from within the same tree.
-		 * The mime type of a tree is recommended to be of the format `application/vnd.code.tree.<treeidlowercase>`.
-		 *
-		 * Use the special `files` mime type to support all types of dropped files {@link DataTransferFile files}, regardless of the file's actual mime type.
-		 *
-		 * To learn the mime type of a dragged item:
-		 * 1. Set up your `DragAndDropController`
-		 * 2. Use the Developer: Set Log Level... command to set the level to "Debug"
-		 * 3. Open the developer tools and drag the item with unknown mime type over your tree. The mime types will be logged to the developer console
-		 *
-		 * Note that mime types that cannot be sent to the extension will be omitted.
+		 * The unique ID of this debug session.
 		 */
-		readonly dropMimeTypes: readonly string[];
+		readonly id: string;
 
 		/**
-		 * The mime types that the {@link TreeDragAndDropController.handleDrag `handleDrag`} method of this `TreeDragAndDropController` may add to the tree data transfer.
-		 * This could be well-defined, existing, mime types, and also mime types defined by the extension.
-		 *
-		 * The recommended mime type of the tree (`application/vnd.code.tree.<treeidlowercase>`) will be automatically added.
+		 * The debug session's type from the {@link DebugConfiguration debug configuration}.
 		 */
-		readonly dragMimeTypes: readonly string[];
+		readonly type: string;
 
 		/**
-		 * When the user starts dragging items from this `DragAndDropController`, `handleDrag` will be called.
-		 * Extensions can use `handleDrag` to add their {@link DataTransferItem `DataTransferItem`} items to the drag and drop.
-		 *
-		 * When the items are dropped on **another tree item** in **the same tree**, your `DataTransferItem` objects
-		 * will be preserved. Use the recommended mime type for the tree (`application/vnd.code.tree.<treeidlowercase>`) to add
-		 * tree objects in a data transfer. See the documentation for `DataTransferItem` for how best to take advantage of this.
-		 *
-		 * To add a data transfer item that can be dragged into the editor, use the application specific mime type "text/uri-list".
-		 * The data for "text/uri-list" should be a string with `toString()`ed Uris separated by `\r\n`. To specify a cursor position in the file,
-		 * set the Uri's fragment to `L3,5`, where 3 is the line number and 5 is the column number.
-		 *
-		 * @param source The source items for the drag and drop operation.
-		 * @param dataTransfer The data transfer associated with this drag.
-		 * @param token A cancellation token indicating that drag has been cancelled.
+		 * The parent session of this debug session, if it was created as a child.
+		 * @see DebugSessionOptions.parentSession
 		 */
-		handleDrag?(source: readonly T[], dataTransfer: DataTransfer, token: CancellationToken): Thenable<void> | void;
+		readonly parentSession?: DebugSession;
 
 		/**
-		 * Called when a drag and drop action results in a drop on the tree that this `DragAndDropController` belongs to.
-		 *
-		 * Extensions should fire {@link TreeDataProvider.onDidChangeTreeData onDidChangeTreeData} for any elements that need to be refreshed.
-		 *
-		 * @param dataTransfer The data transfer items of the source of the drag.
-		 * @param target The target tree element that the drop is occurring on. When undefined, the target is the root.
-		 * @param token A cancellation token indicating that the drop has been cancelled.
+		 * The debug session's name is initially taken from the {@link DebugConfiguration debug configuration}.
+		 * Any changes will be properly reflected in the UI.
 		 */
-		handleDrop?(target: T | undefined, dataTransfer: DataTransfer, token: CancellationToken): Thenable<void> | void;
+		name: string;
+
+		/**
+		 * The workspace folder of this session or `undefined` for a folderless setup.
+		 */
+		readonly workspaceFolder: WorkspaceFolder | undefined;
+
+		/**
+		 * The "resolved" {@link DebugConfiguration debug configuration} of this session.
+		 * "Resolved" means that
+		 * - all variables have been substituted and
+		 * - platform specific attribute sections have been "flattened" for the matching platform and removed for non-matching platforms.
+		 */
+		readonly configuration: DebugConfiguration;
+
+		/**
+		 * Send a custom request to the debug adapter.
+		 */
+		customRequest(command: string, args?: any): Thenable<any>;
+
+		/**
+		 * Maps a breakpoint in the editor to the corresponding Debug Adapter Protocol (DAP) breakpoint that is managed by the debug adapter of the debug session.
+		 * If no DAP breakpoint exists (either because the editor breakpoint was not yet registered or because the debug adapter is not interested in the breakpoint), the value `undefined` is returned.
+		 *
+		 * @param breakpoint A {@link Breakpoint} in the editor.
+		 * @returns A promise that resolves to the Debug Adapter Protocol breakpoint or `undefined`.
+		 */
+		getDebugProtocolBreakpoint(breakpoint: Breakpoint): Thenable<DebugProtocolBreakpoint | undefined>;
 	}
 
 	/**
-	 * An EvaluatableExpression represents an expression in a document that can be evaluated by an active debugger or runtime.
-	 * The result of this evaluation is shown in a tooltip-like widget.
-	 * If only a range is specified, the expression will be extracted from the underlying document.
-	 * An optional expression can be used to override the extracted expression.
-	 * In this case the range is still used to highlight the range in the document.
+	 * A custom Debug Adapter Protocol event received from a {@link DebugSession debug session}.
 	 */
-	export class EvaluatableExpression {
-
-		/*
-		 * The range is used to extract the evaluatable expression from the underlying document and to highlight it.
+	export interface DebugSessionCustomEvent {
+		/**
+		 * The {@link DebugSession debug session} for which the custom event was received.
 		 */
-		readonly range: Range;
-
-		/*
-		 * If specified the expression overrides the extracted expression.
-		 */
-		readonly expression?: string | undefined;
+		readonly session: DebugSession;
 
 		/**
-		 * Creates a new evaluatable expression object.
-		 *
-		 * @param range The range in the underlying document from which the evaluatable expression is extracted.
-		 * @param expression If specified overrides the extracted expression.
+		 * Type of event.
 		 */
-		constructor(range: Range, expression?: string);
+		readonly event: string;
+
+		/**
+		 * Event specific information.
+		 */
+		readonly body: any;
 	}
 
 	/**
-	 * The inline values provider interface defines the contract between extensions and the editor's debugger inline values feature.
-	 * In this contract the provider returns inline value information for a given document range
-	 * and the editor shows this information in the editor at the end of lines.
+	 * A debug configuration provider allows to add debug configurations to the debug service
+	 * and to resolve launch configurations before they are used to start a debug session.
+	 * A debug configuration provider is registered via {@link debug.registerDebugConfigurationProvider}.
 	 */
-	export interface InlineValuesProvider {
-
+	export interface DebugConfigurationProvider {
 		/**
-		 * An optional event to signal that inline values have changed.
-		 * @see {@link EventEmitter}
-		 */
-		onDidChangeInlineValues?: Event<void> | undefined;
-
-		/**
-		 * Provide "inline value" information for a given document and range.
-		 * The editor calls this method whenever debugging stops in the given document.
-		 * The returned inline values information is rendered in the editor at the end of lines.
+		 * Provides {@link DebugConfiguration debug configuration} to the debug service. If more than one debug configuration provider is
+		 * registered for the same type, debug configurations are concatenated in arbitrary order.
 		 *
-		 * @param document The document for which the inline values information is needed.
-		 * @param viewPort The visible document range for which inline values should be computed.
-		 * @param context A bag containing contextual information like the current location.
+		 * @param folder The workspace folder for which the configurations are used or `undefined` for a folderless setup.
 		 * @param token A cancellation token.
-		 * @returns An array of InlineValueDescriptors or a thenable that resolves to such. The lack of a result can be
-		 * signaled by returning `undefined` or `null`.
+		 * @returns An array of {@link DebugConfiguration debug configurations}.
 		 */
-		provideInlineValues(document: TextDocument, viewPort: Range, context: InlineValueContext, token: CancellationToken): ProviderResult<InlineValue[]>;
+		provideDebugConfigurations?(folder: WorkspaceFolder | undefined, token?: CancellationToken): ProviderResult<DebugConfiguration[]>;
+
+		/**
+		 * Resolves a {@link DebugConfiguration debug configuration} by filling in missing values or by adding/changing/removing attributes.
+		 * If more than one debug configuration provider is registered for the same type, the resolveDebugConfiguration calls are chained
+		 * in arbitrary order and the initial debug configuration is piped through the chain.
+		 * Returning the value 'undefined' prevents the debug session from starting.
+		 * Returning the value 'null' prevents the debug session from starting and opens the underlying debug configuration instead.
+		 *
+		 * @param folder The workspace folder from which the configuration originates from or `undefined` for a folderless setup.
+		 * @param debugConfiguration The {@link DebugConfiguration debug configuration} to resolve.
+		 * @param token A cancellation token.
+		 * @returns The resolved debug configuration or undefined or null.
+		 */
+		resolveDebugConfiguration?(folder: WorkspaceFolder | undefined, debugConfiguration: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration>;
+
+		/**
+		 * This hook is directly called after 'resolveDebugConfiguration' but with all variables substituted.
+		 * It can be used to resolve or verify a {@link DebugConfiguration debug configuration} by filling in missing values or by adding/changing/removing attributes.
+		 * If more than one debug configuration provider is registered for the same type, the 'resolveDebugConfigurationWithSubstitutedVariables' calls are chained
+		 * in arbitrary order and the initial debug configuration is piped through the chain.
+		 * Returning the value 'undefined' prevents the debug session from starting.
+		 * Returning the value 'null' prevents the debug session from starting and opens the underlying debug configuration instead.
+		 *
+		 * @param folder The workspace folder from which the configuration originates from or `undefined` for a folderless setup.
+		 * @param debugConfiguration The {@link DebugConfiguration debug configuration} to resolve.
+		 * @param token A cancellation token.
+		 * @returns The resolved debug configuration or undefined or null.
+		 */
+		resolveDebugConfigurationWithSubstitutedVariables?(folder: WorkspaceFolder | undefined, debugConfiguration: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration>;
 	}
 
 	/**
- * An event describing the changes to the set of {@link Breakpoint breakpoints}.
- */
+	 * Represents a debug adapter executable and optional arguments and runtime options passed to it.
+	 */
+	export class DebugAdapterExecutable {
+
+		/**
+		 * Creates a description for a debug adapter based on an executable program.
+		 *
+		 * @param command The command or executable path that implements the debug adapter.
+		 * @param args Optional arguments to be passed to the command or executable.
+		 * @param options Optional options to be used when starting the command or executable.
+		 */
+		constructor(command: string, args?: string[], options?: DebugAdapterExecutableOptions);
+
+		/**
+		 * The command or path of the debug adapter executable.
+		 * A command must be either an absolute path of an executable or the name of an command to be looked up via the PATH environment variable.
+		 * The special value 'node' will be mapped to the editor's built-in Node.js runtime.
+		 */
+		readonly command: string;
+
+		/**
+		 * The arguments passed to the debug adapter executable. Defaults to an empty array.
+		 */
+		readonly args: string[];
+
+		/**
+		 * Optional options to be used when the debug adapter is started.
+		 * Defaults to undefined.
+		 */
+		readonly options?: DebugAdapterExecutableOptions;
+	}
+
+	/**
+	 * Options for a debug adapter executable.
+	 */
+	export interface DebugAdapterExecutableOptions {
+
+		/**
+		 * The additional environment of the executed program or shell. If omitted
+		 * the parent process' environment is used. If provided it is merged with
+		 * the parent process' environment.
+		 */
+		env?: { [key: string]: string };
+
+		/**
+		 * The current working directory for the executed debug adapter.
+		 */
+		cwd?: string;
+	}
+
+	/**
+	 * Represents a debug adapter running as a socket based server.
+	 */
+	export class DebugAdapterServer {
+
+		/**
+		 * The port.
+		 */
+		readonly port: number;
+
+		/**
+		 * The host.
+		 */
+		readonly host?: string | undefined;
+
+		/**
+		 * Create a description for a debug adapter running as a socket based server.
+		 */
+		constructor(port: number, host?: string);
+	}
+
+	/**
+	 * Represents a debug adapter running as a Named Pipe (on Windows)/UNIX Domain Socket (on non-Windows) based server.
+	 */
+	export class DebugAdapterNamedPipeServer {
+		/**
+		 * The path to the NamedPipe/UNIX Domain Socket.
+		 */
+		readonly path: string;
+
+		/**
+		 * Create a description for a debug adapter running as a Named Pipe (on Windows)/UNIX Domain Socket (on non-Windows) based server.
+		 */
+		constructor(path: string);
+	}
+
+	/**
+	 * A debug adapter that implements the Debug Adapter Protocol can be registered with the editor if it implements the DebugAdapter interface.
+	 */
+	export interface DebugAdapter extends Disposable {
+
+		/**
+		 * An event which fires after the debug adapter has sent a Debug Adapter Protocol message to the editor.
+		 * Messages can be requests, responses, or events.
+		 */
+		readonly onDidSendMessage: Event<DebugProtocolMessage>;
+
+		/**
+		 * Handle a Debug Adapter Protocol message.
+		 * Messages can be requests, responses, or events.
+		 * Results or errors are returned via onSendMessage events.
+		 * @param message A Debug Adapter Protocol message
+		 */
+		handleMessage(message: DebugProtocolMessage): void;
+	}
+
+	/**
+	 * A debug adapter descriptor for an inline implementation.
+	 */
+	export class DebugAdapterInlineImplementation {
+
+		/**
+		 * Create a descriptor for an inline implementation of a debug adapter.
+		 */
+		constructor(implementation: DebugAdapter);
+	}
+
+	/**
+	 * Represents the different types of debug adapters
+	 */
+	export type DebugAdapterDescriptor = DebugAdapterExecutable | DebugAdapterServer | DebugAdapterNamedPipeServer | DebugAdapterInlineImplementation;
+
+	/**
+	 * A debug adaper factory that creates {@link DebugAdapterDescriptor debug adapter descriptors}.
+	 */
+	export interface DebugAdapterDescriptorFactory {
+		/**
+		 * 'createDebugAdapterDescriptor' is called at the start of a debug session to provide details about the debug adapter to use.
+		 * These details must be returned as objects of type {@link DebugAdapterDescriptor}.
+		 * Currently two types of debug adapters are supported:
+		 * - a debug adapter executable is specified as a command path and arguments (see {@link DebugAdapterExecutable}),
+		 * - a debug adapter server reachable via a communication port (see {@link DebugAdapterServer}).
+		 * If the method is not implemented the default behavior is this:
+		 *   createDebugAdapter(session: DebugSession, executable: DebugAdapterExecutable) {
+		 *      if (typeof session.configuration.debugServer === 'number') {
+		 *         return new DebugAdapterServer(session.configuration.debugServer);
+		 *      }
+		 *      return executable;
+		 *   }
+		 * @param session The {@link DebugSession debug session} for which the debug adapter will be used.
+		 * @param executable The debug adapter's executable information as specified in the package.json (or undefined if no such information exists).
+		 * @returns a {@link DebugAdapterDescriptor debug adapter descriptor} or undefined.
+		 */
+		createDebugAdapterDescriptor(session: DebugSession, executable: DebugAdapterExecutable | undefined): ProviderResult<DebugAdapterDescriptor>;
+	}
+
+	/**
+	 * A Debug Adapter Tracker is a means to track the communication between the editor and a Debug Adapter.
+	 */
+	export interface DebugAdapterTracker {
+		/**
+		 * A session with the debug adapter is about to be started.
+		 */
+		onWillStartSession?(): void;
+		/**
+		 * The debug adapter is about to receive a Debug Adapter Protocol message from the editor.
+		 */
+		onWillReceiveMessage?(message: any): void;
+		/**
+		 * The debug adapter has sent a Debug Adapter Protocol message to the editor.
+		 */
+		onDidSendMessage?(message: any): void;
+		/**
+		 * The debug adapter session is about to be stopped.
+		 */
+		onWillStopSession?(): void;
+		/**
+		 * An error with the debug adapter has occurred.
+		 */
+		onError?(error: Error): void;
+		/**
+		 * The debug adapter has exited with the given exit code or signal.
+		 */
+		onExit?(code: number | undefined, signal: string | undefined): void;
+	}
+
+	/**
+	 * A debug adaper factory that creates {@link DebugAdapterTracker debug adapter trackers}.
+	 */
+	export interface DebugAdapterTrackerFactory {
+		/**
+		 * The method 'createDebugAdapterTracker' is called at the start of a debug session in order
+		 * to return a "tracker" object that provides read-access to the communication between the editor and a debug adapter.
+		 *
+		 * @param session The {@link DebugSession debug session} for which the debug adapter tracker will be used.
+		 * @returns A {@link DebugAdapterTracker debug adapter tracker} or undefined.
+		 */
+		createDebugAdapterTracker(session: DebugSession): ProviderResult<DebugAdapterTracker>;
+	}
+
+	/**
+	 * Represents the debug console.
+	 */
+	export interface DebugConsole {
+		/**
+		 * Append the given value to the debug console.
+		 *
+		 * @param value A string, falsy values will not be printed.
+		 */
+		append(value: string): void;
+
+		/**
+		 * Append the given value and a line feed character
+		 * to the debug console.
+		 *
+		 * @param value A string, falsy values will be printed.
+		 */
+		appendLine(value: string): void;
+	}
+
+	/**
+	 * An event describing the changes to the set of {@link Breakpoint breakpoints}.
+	 */
 	export interface BreakpointsChangeEvent {
 		/**
 		 * Added breakpoints.
@@ -16381,120 +16083,322 @@ declare module 'vscode' {
 	}
 
 	/**
-	 * A TestRunProfile describes one way to execute tests in a {@link TestController}.
+	 * A breakpoint specified by a source location.
 	 */
-	export interface TestRunProfile {
+	export class SourceBreakpoint extends Breakpoint {
 		/**
-		 * Label shown to the user in the UI.
-		 *
-		 * Note that the label has some significance if the user requests that
-		 * tests be re-run in a certain way. For example, if tests were run
-		 * normally and the user requests to re-run them in debug mode, the editor
-		 * will attempt use a configuration with the same label of the `Debug`
-		 * kind. If there is no such configuration, the default will be used.
+		 * The source and line position of this breakpoint.
 		 */
-		label: string;
+		readonly location: Location;
 
 		/**
-		 * Configures what kind of execution this profile controls. If there
-		 * are no profiles for a kind, it will not be available in the UI.
+		 * Create a new breakpoint for a source location.
 		 */
-		readonly kind: TestRunProfileKind;
-
-		/**
-		 * Controls whether this profile is the default action that will
-		 * be taken when its kind is actioned. For example, if the user clicks
-		 * the generic "run all" button, then the default profile for
-		 * {@link TestRunProfileKind.Run} will be executed, although the
-		 * user can configure this.
-		 *
-		 * Changes the user makes in their default profiles will be reflected
-		 * in this property after a {@link onDidChangeDefault} event.
-		 */
-		isDefault: boolean;
-
-		/**
-		 * Fired when a user has changed whether this is a default profile. The
-		 * event contains the new value of {@link isDefault}
-		 */
-		onDidChangeDefault: Event<boolean>;
-
-		/**
-		 * Whether this profile supports continuous running of requests. If so,
-		 * then {@link TestRunRequest.continuous} may be set to `true`. Defaults
-		 * to false.
-		 */
-		supportsContinuousRun: boolean;
-
-		/**
-		 * Associated tag for the profile. If this is set, only {@link TestItem}
-		 * instances with the same tag will be eligible to execute in this profile.
-		 */
-		tag: TestTag | undefined;
-
-		/**
-		 * If this method is present, a configuration gear will be present in the
-		 * UI, and this method will be invoked when it's clicked. When called,
-		 * you can take other editor actions, such as showing a quick pick or
-		 * opening a configuration file.
-		 */
-		configureHandler: (() => void) | undefined;
-
-		/**
-		 * Handler called to start a test run. When invoked, the function should call
-		 * {@link TestController.createTestRun} at least once, and all test runs
-		 * associated with the request should be created before the function returns
-		 * or the returned promise is resolved.
-		 *
-		 * If {@link supportsContinuousRun} is set, then {@link TestRunRequest.continuous}
-		 * may be `true`. In this case, the profile should observe changes to
-		 * source code and create new test runs by calling {@link TestController.createTestRun},
-		 * until the cancellation is requested on the `token`.
-		 *
-		 * @param request Request information for the test run.
-		 * @param cancellationToken Token that signals the used asked to abort the
-		 * test run. If cancellation is requested on this token, all {@link TestRun}
-		 * instances associated with the request will be
-		 * automatically cancelled as well.
-		 */
-		runHandler: (request: TestRunRequest, token: CancellationToken) => Thenable<void> | void;
-
-		/**
-		 * An extension-provided function that provides detailed statement and
-		 * function-level coverage for a file. The editor will call this when more
-		 * detail is needed for a file, such as when it's opened in an editor or
-		 * expanded in the **Test Coverage** view.
-		 *
-		 * The {@link FileCoverage} object passed to this function is the same instance
-		 * emitted on {@link TestRun.addCoverage} calls associated with this profile.
-		 */
-		loadDetailedCoverage?: (testRun: TestRun, fileCoverage: FileCoverage, token: CancellationToken) => Thenable<FileCoverageDetail[]>;
-
-		/**
-		 * Deletes the run profile.
-		 */
-		dispose(): void;
+		constructor(location: Location, enabled?: boolean, condition?: string, hitCondition?: string, logMessage?: string);
 	}
 
 	/**
-	 * The evaluatable expression provider interface defines the contract between extensions and
-	 * the debug hover. In this contract the provider returns an evaluatable expression for a given position
-	 * in a document and the editor evaluates this expression in the active debug session and shows the result in a debug hover.
+	 * A breakpoint specified by a function name.
 	 */
-	export interface EvaluatableExpressionProvider {
+	export class FunctionBreakpoint extends Breakpoint {
+		/**
+		 * The name of the function to which this breakpoint is attached.
+		 */
+		readonly functionName: string;
 
 		/**
-		 * Provide an evaluatable expression for the given document and position.
-		 * The editor will evaluate this expression in the active debug session and will show the result in the debug hover.
-		 * The expression can be implicitly specified by the range in the underlying document or by explicitly returning an expression.
-		 *
-		 * @param document The document for which the debug hover is about to appear.
-		 * @param position The line and character position in the document where the debug hover is about to appear.
-		 * @param token A cancellation token.
-		 * @returns An EvaluatableExpression or a thenable that resolves to such. The lack of a result can be
-		 * signaled by returning `undefined` or `null`.
+		 * Create a new function breakpoint.
 		 */
-		provideEvaluatableExpression(document: TextDocument, position: Position, token: CancellationToken): ProviderResult<EvaluatableExpression>;
+		constructor(functionName: string, enabled?: boolean, condition?: string, hitCondition?: string, logMessage?: string);
+	}
+
+	/**
+	 * Debug console mode used by debug session, see {@link DebugSessionOptions options}.
+	 */
+	export enum DebugConsoleMode {
+		/**
+		 * Debug session should have a separate debug console.
+		 */
+		Separate = 0,
+
+		/**
+		 * Debug session should share debug console with its parent session.
+		 * This value has no effect for sessions which do not have a parent session.
+		 */
+		MergeWithParent = 1
+	}
+
+	/**
+	 * Options for {@link debug.startDebugging starting a debug session}.
+	 */
+	export interface DebugSessionOptions {
+
+		/**
+		 * When specified the newly created debug session is registered as a "child" session of this
+		 * "parent" debug session.
+		 */
+		parentSession?: DebugSession;
+
+		/**
+		 * Controls whether lifecycle requests like 'restart' are sent to the newly created session or its parent session.
+		 * By default (if the property is false or missing), lifecycle requests are sent to the new session.
+		 * This property is ignored if the session has no parent session.
+		 */
+		lifecycleManagedByParent?: boolean;
+
+		/**
+		 * Controls whether this session should have a separate debug console or share it
+		 * with the parent session. Has no effect for sessions which do not have a parent session.
+		 * Defaults to Separate.
+		 */
+		consoleMode?: DebugConsoleMode;
+
+		/**
+		 * Controls whether this session should run without debugging, thus ignoring breakpoints.
+		 * When this property is not specified, the value from the parent session (if there is one) is used.
+		 */
+		noDebug?: boolean;
+
+		/**
+		 * Controls if the debug session's parent session is shown in the CALL STACK view even if it has only a single child.
+		 * By default, the debug session will never hide its parent.
+		 * If compact is true, debug sessions with a single child are hidden in the CALL STACK view to make the tree more compact.
+		 */
+		compact?: boolean;
+
+		/**
+		 * When true, a save will not be triggered for open editors when starting a debug session, regardless of the value of the `debug.saveBeforeStart` setting.
+		 */
+		suppressSaveBeforeStart?: boolean;
+
+		/**
+		 * When true, the debug toolbar will not be shown for this session.
+		 */
+		suppressDebugToolbar?: boolean;
+
+		/**
+		 * When true, the window statusbar color will not be changed for this session.
+		 */
+		suppressDebugStatusbar?: boolean;
+
+		/**
+		 * When true, the debug viewlet will not be automatically revealed for this session.
+		 */
+		suppressDebugView?: boolean;
+
+		/**
+		 * Signals to the editor that the debug session was started from a test run
+		 * request. This is used to link the lifecycle of the debug session and
+		 * test run in UI actions.
+		 */
+		testRun?: TestRun;
+	}
+
+	/**
+	 * A DebugConfigurationProviderTriggerKind specifies when the `provideDebugConfigurations` method of a `DebugConfigurationProvider` is triggered.
+	 * Currently there are two situations: to provide the initial debug configurations for a newly created launch.json or
+	 * to provide dynamically generated debug configurations when the user asks for them through the UI (e.g. via the "Select and Start Debugging" command).
+	 * A trigger kind is used when registering a `DebugConfigurationProvider` with {@link debug.registerDebugConfigurationProvider}.
+	 */
+	export enum DebugConfigurationProviderTriggerKind {
+		/**
+		 *	`DebugConfigurationProvider.provideDebugConfigurations` is called to provide the initial debug configurations for a newly created launch.json.
+		 */
+		Initial = 1,
+		/**
+		 * `DebugConfigurationProvider.provideDebugConfigurations` is called to provide dynamically generated debug configurations when the user asks for them through the UI (e.g. via the "Select and Start Debugging" command).
+		 */
+		Dynamic = 2
+	}
+
+	/**
+	 * Represents a thread in a debug session.
+	 */
+	export class DebugThread {
+		/**
+		 * Debug session for thread.
+		 */
+		readonly session: DebugSession;
+
+		/**
+		 * ID of the associated thread in the debug protocol.
+		 */
+		readonly threadId: number;
+
+		/**
+		 * @hidden
+		 */
+		private constructor(session: DebugSession, threadId: number);
+	}
+
+	/**
+	 * Represents a stack frame in a debug session.
+	 */
+	export class DebugStackFrame {
+		/**
+		 * Debug session for thread.
+		 */
+		readonly session: DebugSession;
+
+		/**
+		 * ID of the associated thread in the debug protocol.
+		 */
+		readonly threadId: number;
+		/**
+		 * ID of the stack frame in the debug protocol.
+		 */
+		readonly frameId: number;
+
+		/**
+		 * @hidden
+		 */
+		private constructor(session: DebugSession, threadId: number, frameId: number);
+	}
+
+	/**
+	 * Namespace for debug functionality.
+	 */
+	export namespace debug {
+
+		/**
+		 * The currently active {@link DebugSession debug session} or `undefined`. The active debug session is the one
+		 * represented by the debug action floating window or the one currently shown in the drop down menu of the debug action floating window.
+		 * If no debug session is active, the value is `undefined`.
+		 */
+		export let activeDebugSession: DebugSession | undefined;
+
+		/**
+		 * The currently active {@link DebugConsole debug console}.
+		 * If no debug session is active, output sent to the debug console is not shown.
+		 */
+		export let activeDebugConsole: DebugConsole;
+
+		/**
+		 * List of breakpoints.
+		 */
+		export let breakpoints: readonly Breakpoint[];
+
+		/**
+		 * An {@link Event} which fires when the {@link debug.activeDebugSession active debug session}
+		 * has changed. *Note* that the event also fires when the active debug session changes
+		 * to `undefined`.
+		 */
+		export const onDidChangeActiveDebugSession: Event<DebugSession | undefined>;
+
+		/**
+		 * An {@link Event} which fires when a new {@link DebugSession debug session} has been started.
+		 */
+		export const onDidStartDebugSession: Event<DebugSession>;
+
+		/**
+		 * An {@link Event} which fires when a custom DAP event is received from the {@link DebugSession debug session}.
+		 */
+		export const onDidReceiveDebugSessionCustomEvent: Event<DebugSessionCustomEvent>;
+
+		/**
+		 * An {@link Event} which fires when a {@link DebugSession debug session} has terminated.
+		 */
+		export const onDidTerminateDebugSession: Event<DebugSession>;
+
+		/**
+		 * An {@link Event} that is emitted when the set of breakpoints is added, removed, or changed.
+		 */
+		export const onDidChangeBreakpoints: Event<BreakpointsChangeEvent>;
+
+		/**
+		 * The currently focused thread or stack frame, or `undefined` if no
+		 * thread or stack is focused. A thread can be focused any time there is
+		 * an active debug session, while a stack frame can only be focused when
+		 * a session is paused and the call stack has been retrieved.
+		 */
+		export const activeStackItem: DebugThread | DebugStackFrame | undefined;
+
+		/**
+		 * An event which fires when the {@link debug.activeStackItem} has changed.
+		 */
+		export const onDidChangeActiveStackItem: Event<DebugThread | DebugStackFrame | undefined>;
+
+		/**
+		 * Register a {@link DebugConfigurationProvider debug configuration provider} for a specific debug type.
+		 * The optional {@link DebugConfigurationProviderTriggerKind triggerKind} can be used to specify when the `provideDebugConfigurations` method of the provider is triggered.
+		 * Currently two trigger kinds are possible: with the value `Initial` (or if no trigger kind argument is given) the `provideDebugConfigurations` method is used to provide the initial debug configurations to be copied into a newly created launch.json.
+		 * With the trigger kind `Dynamic` the `provideDebugConfigurations` method is used to dynamically determine debug configurations to be presented to the user (in addition to the static configurations from the launch.json).
+		 * Please note that the `triggerKind` argument only applies to the `provideDebugConfigurations` method: so the `resolveDebugConfiguration` methods are not affected at all.
+		 * Registering a single provider with resolve methods for different trigger kinds, results in the same resolve methods called multiple times.
+		 * More than one provider can be registered for the same type.
+		 *
+		 * @param debugType The debug type for which the provider is registered.
+		 * @param provider The {@link DebugConfigurationProvider debug configuration provider} to register.
+		 * @param triggerKind The {@link DebugConfigurationProviderTriggerKind trigger} for which the 'provideDebugConfiguration' method of the provider is registered. If `triggerKind` is missing, the value `DebugConfigurationProviderTriggerKind.Initial` is assumed.
+		 * @returns A {@link Disposable} that unregisters this provider when being disposed.
+		 */
+		export function registerDebugConfigurationProvider(debugType: string, provider: DebugConfigurationProvider, triggerKind?: DebugConfigurationProviderTriggerKind): Disposable;
+
+		/**
+		 * Register a {@link DebugAdapterDescriptorFactory debug adapter descriptor factory} for a specific debug type.
+		 * An extension is only allowed to register a DebugAdapterDescriptorFactory for the debug type(s) defined by the extension. Otherwise an error is thrown.
+		 * Registering more than one DebugAdapterDescriptorFactory for a debug type results in an error.
+		 *
+		 * @param debugType The debug type for which the factory is registered.
+		 * @param factory The {@link DebugAdapterDescriptorFactory debug adapter descriptor factory} to register.
+		 * @returns A {@link Disposable} that unregisters this factory when being disposed.
+		 */
+		export function registerDebugAdapterDescriptorFactory(debugType: string, factory: DebugAdapterDescriptorFactory): Disposable;
+
+		/**
+		 * Register a debug adapter tracker factory for the given debug type.
+		 *
+		 * @param debugType The debug type for which the factory is registered or '*' for matching all debug types.
+		 * @param factory The {@link DebugAdapterTrackerFactory debug adapter tracker factory} to register.
+		 * @returns A {@link Disposable} that unregisters this factory when being disposed.
+		 */
+		export function registerDebugAdapterTrackerFactory(debugType: string, factory: DebugAdapterTrackerFactory): Disposable;
+
+		/**
+		 * Start debugging by using either a named launch or named compound configuration,
+		 * or by directly passing a {@link DebugConfiguration}.
+		 * The named configurations are looked up in '.vscode/launch.json' found in the given folder.
+		 * Before debugging starts, all unsaved files are saved and the launch configurations are brought up-to-date.
+		 * Folder specific variables used in the configuration (e.g. '${workspaceFolder}') are resolved against the given folder.
+		 * @param folder The {@link WorkspaceFolder workspace folder} for looking up named configurations and resolving variables or `undefined` for a non-folder setup.
+		 * @param nameOrConfiguration Either the name of a debug or compound configuration or a {@link DebugConfiguration} object.
+		 * @param parentSessionOrOptions Debug session options. When passed a parent {@link DebugSession debug session}, assumes options with just this parent session.
+		 * @returns A thenable that resolves when debugging could be successfully started.
+		 */
+		export function startDebugging(folder: WorkspaceFolder | undefined, nameOrConfiguration: string | DebugConfiguration, parentSessionOrOptions?: DebugSession | DebugSessionOptions): Thenable<boolean>;
+
+		/**
+		 * Stop the given debug session or stop all debug sessions if session is omitted.
+		 *
+		 * @param session The {@link DebugSession debug session} to stop; if omitted all sessions are stopped.
+		 * @returns A thenable that resolves when the session(s) have been stopped.
+		 */
+		export function stopDebugging(session?: DebugSession): Thenable<void>;
+
+		/**
+		 * Add breakpoints.
+		 * @param breakpoints The breakpoints to add.
+		 */
+		export function addBreakpoints(breakpoints: readonly Breakpoint[]): void;
+
+		/**
+		 * Remove breakpoints.
+		 * @param breakpoints The breakpoints to remove.
+		 */
+		export function removeBreakpoints(breakpoints: readonly Breakpoint[]): void;
+
+		/**
+		 * Converts a "Source" descriptor object received via the Debug Adapter Protocol into a Uri that can be used to load its contents.
+		 * If the source descriptor is based on a path, a file Uri is returned.
+		 * If the source descriptor uses a reference number, a specific debug Uri (scheme 'debug') is constructed that requires a corresponding ContentProvider and a running debug session
+		 *
+		 * If the "Source" descriptor has insufficient information for creating the Uri, an error is thrown.
+		 *
+		 * @param source An object conforming to the [Source](https://microsoft.github.io/debug-adapter-protocol/specification#Types_Source) type defined in the Debug Adapter Protocol.
+		 * @param session An optional debug session that will be used when the source descriptor uses a reference number to load the contents from an active debug session.
+		 * @returns A uri that can be used to load the contents of the source.
+		 */
+		export function asDebugSourceUri(source: DebugProtocolSource, session?: DebugSession): Uri;
 	}
 
 	/**
@@ -17288,6 +17192,102 @@ declare module 'vscode' {
 		 * @param id ID of the test tag.
 		 */
 		constructor(id: string);
+	}
+
+	/**
+	 * A TestRunProfile describes one way to execute tests in a {@link TestController}.
+	 */
+	export interface TestRunProfile {
+		/**
+		 * Label shown to the user in the UI.
+		 *
+		 * Note that the label has some significance if the user requests that
+		 * tests be re-run in a certain way. For example, if tests were run
+		 * normally and the user requests to re-run them in debug mode, the editor
+		 * will attempt use a configuration with the same label of the `Debug`
+		 * kind. If there is no such configuration, the default will be used.
+		 */
+		label: string;
+
+		/**
+		 * Configures what kind of execution this profile controls. If there
+		 * are no profiles for a kind, it will not be available in the UI.
+		 */
+		readonly kind: TestRunProfileKind;
+
+		/**
+		 * Controls whether this profile is the default action that will
+		 * be taken when its kind is actioned. For example, if the user clicks
+		 * the generic "run all" button, then the default profile for
+		 * {@link TestRunProfileKind.Run} will be executed, although the
+		 * user can configure this.
+		 *
+		 * Changes the user makes in their default profiles will be reflected
+		 * in this property after a {@link onDidChangeDefault} event.
+		 */
+		isDefault: boolean;
+
+		/**
+		 * Fired when a user has changed whether this is a default profile. The
+		 * event contains the new value of {@link isDefault}
+		 */
+		onDidChangeDefault: Event<boolean>;
+
+		/**
+		 * Whether this profile supports continuous running of requests. If so,
+		 * then {@link TestRunRequest.continuous} may be set to `true`. Defaults
+		 * to false.
+		 */
+		supportsContinuousRun: boolean;
+
+		/**
+		 * Associated tag for the profile. If this is set, only {@link TestItem}
+		 * instances with the same tag will be eligible to execute in this profile.
+		 */
+		tag: TestTag | undefined;
+
+		/**
+		 * If this method is present, a configuration gear will be present in the
+		 * UI, and this method will be invoked when it's clicked. When called,
+		 * you can take other editor actions, such as showing a quick pick or
+		 * opening a configuration file.
+		 */
+		configureHandler: (() => void) | undefined;
+
+		/**
+		 * Handler called to start a test run. When invoked, the function should call
+		 * {@link TestController.createTestRun} at least once, and all test runs
+		 * associated with the request should be created before the function returns
+		 * or the returned promise is resolved.
+		 *
+		 * If {@link supportsContinuousRun} is set, then {@link TestRunRequest.continuous}
+		 * may be `true`. In this case, the profile should observe changes to
+		 * source code and create new test runs by calling {@link TestController.createTestRun},
+		 * until the cancellation is requested on the `token`.
+		 *
+		 * @param request Request information for the test run.
+		 * @param cancellationToken Token that signals the used asked to abort the
+		 * test run. If cancellation is requested on this token, all {@link TestRun}
+		 * instances associated with the request will be
+		 * automatically cancelled as well.
+		 */
+		runHandler: (request: TestRunRequest, token: CancellationToken) => Thenable<void> | void;
+
+		/**
+		 * An extension-provided function that provides detailed statement and
+		 * function-level coverage for a file. The editor will call this when more
+		 * detail is needed for a file, such as when it's opened in an editor or
+		 * expanded in the **Test Coverage** view.
+		 *
+		 * The {@link FileCoverage} object passed to this function is the same instance
+		 * emitted on {@link TestRun.addCoverage} calls associated with this profile.
+		 */
+		loadDetailedCoverage?: (testRun: TestRun, fileCoverage: FileCoverage, token: CancellationToken) => Thenable<FileCoverageDetail[]>;
+
+		/**
+		 * Deletes the run profile.
+		 */
+		dispose(): void;
 	}
 
 	/**

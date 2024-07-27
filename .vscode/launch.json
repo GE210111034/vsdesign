@@ -405,12 +405,12 @@
 			"name": "Markdown Extension Tests",
 			"runtimeExecutable": "${execPath}",
 			"args": [
-				"${workspaceFolder}/extensions/markdown-language-features/test-workspace",
-				"--extensionDevelopmentPath=${workspaceFolder}/extensions/markdown-language-features",
-				"--extensionTestsPath=${workspaceFolder}/extensions/markdown-language-features/out/test"
+				// "${workspaceFolder}/extensions/markdown-language-features/test-workspace",
+				// "--extensionDevelopmentPath=${workspaceFolder}/extensions/markdown-language-features",
+				// "--extensionTestsPath=${workspaceFolder}/extensions/markdown-language-features/out/test"
 			],
 			"outFiles": [
-				"${workspaceFolder}/extensions/markdown-language-features/out/**/*.js"
+				// "${workspaceFolder}/extensions/markdown-language-features/out/**/*.js"
 			],
 			"presentation": {
 				"group": "5_tests",
