@@ -48,7 +48,7 @@ module.exports.unicodeFilter = [
 	'!extensions/markdown-math/notebook-out/**',
 	'!extensions/ipynb/notebook-out/**',
 	'!extensions/notebook-renderers/renderer-out/**',
-	'!extensions/php-language-features/src/features/phpGlobalFunctions.ts',
+	// '!extensions/php-language-features/src/features/phpGlobalFunctions.ts',
 	'!extensions/typescript-language-features/test-workspace/**',
 	'!extensions/vscode-api-tests/testWorkspace/**',
 	'!extensions/vscode-api-tests/testWorkspace2/**',
